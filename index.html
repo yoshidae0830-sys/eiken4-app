@@ -15,7 +15,8 @@ h1{font-size:22px;margin:0} .count{font-size:14px;color:#68707a}
 .card{height:370px;background:white;border-radius:22px;box-shadow:0 8px 28px #00000012;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;position:relative;cursor:pointer;user-select:none}
 .hint{position:absolute;top:18px;font-size:13px;color:#9299a2}
 .word{font-size:48px;font-weight:750;text-align:center}
-.meaning{font-size:29px;font-weight:650;margin-top:18px;color:#4b5560;text-align:center;min-height:42px}
+.meaning{font-size:27px;font-weight:650;margin-top:16px;color:#4b5560;text-align:center;line-height:1.45;min-height:80px}
+.past{font-size:20px;font-weight:600;color:#68707a;margin-top:7px}
 .hidden{visibility:hidden}
 .tap{position:absolute;bottom:18px;color:#9299a2;font-size:13px}
 .actions{display:flex;justify-content:center;gap:9px;margin:14px 0 8px;flex-wrap:wrap}
@@ -32,23 +33,29 @@ button:active{transform:scale(.98)}
 .panel h2{font-size:16px;margin:0 0 10px}
 .stats{display:flex;gap:8px;margin:10px 0 14px}
 .stat{flex:1;text-align:center;background:#f7f8fa;border-radius:12px;padding:11px 5px}
-.num{display:block;font-size:22px;font-weight:750} .small{font-size:13px;color:#68707a;line-height:1.6}
+.num{display:block;font-size:22px;font-weight:750}
+.small{font-size:13px;color:#68707a;line-height:1.6}
 .panel-buttons{display:flex;gap:8px;flex-wrap:wrap}
-@media(max-width:430px){.card{height:340px}.word{font-size:40px}.meaning{font-size:25px}}
+.quiz{display:none;margin-top:18px;background:white;border-radius:18px;padding:20px;box-shadow:0 4px 16px #0000000d;text-align:center}
+.quiz.active{display:block}
+.quiz-word{font-size:31px;font-weight:750;margin:8px 0 18px}
+.quiz-question{font-size:17px;color:#68707a}
+.quiz-options{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.quiz-options button{background:#f7f8fa}
+.quiz-result{min-height:25px;margin-top:12px;font-weight:650}
+@media(max-width:430px){.card{height:340px}.word{font-size:40px}.meaning{font-size:25px}.quiz-options{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <div class="app">
-<header>
-  <h1>英検4級 単語帳</h1>
-  <div class="count" id="count"></div>
-</header>
+<header><h1>英検4級 単語帳</h1><div class="count" id="count"></div></header>
 <div class="progress"><div class="bar" id="bar"></div></div>
 
 <div class="card" id="card" onclick="flip()">
   <div class="hint" id="hint">表</div>
   <div class="word" id="word"></div>
   <div class="meaning hidden" id="meaning"></div>
+  <div class="past hidden" id="past"></div>
   <div class="tap" id="tap">タップして日本語を表示</div>
 </div>
 
@@ -73,29 +80,44 @@ button:active{transform:scale(.98)}
   </div>
   <div class="panel-buttons">
     <button class="secondary" onclick="startReview()">🔁 未習得だけ復習</button>
+    <button class="secondary" onclick="startRetention()">🧠 定着チェック</button>
     <button class="secondary" onclick="shuffle()">🔀 全200語をシャッフル</button>
     <button class="secondary" onclick="resetAll()">最初から</button>
   </div>
-  <p class="small">「覚えた」を押した単語は復習モードから外れます。「まだ覚えていない」を押した単語は復習リストに残ります。学習状況はこのブラウザに保存されます。</p>
+  <p class="small">動詞は日本語の意味と一緒に過去形も表示します。定着チェックでは、覚えた単語から出題し、英単語の意味を確認します。間違えた単語は自動的に「まだ覚えていない」に戻ります。</p>
+</div>
+
+<div class="quiz" id="quiz">
+  <div class="quiz-question">定着チェック：この英単語の意味は？</div>
+  <div class="quiz-word" id="quizWord"></div>
+  <div class="quiz-options" id="quizOptions"></div>
+  <div class="quiz-result" id="quizResult"></div>
+  <button class="secondary" onclick="nextRetention()" id="quizNext" style="display:none;margin-top:10px">次の定着チェック →</button>
 </div>
 </div>
 
 <script>
 const original=[{"en": "about", "ja": "～について"}, {"en": "afternoon", "ja": "午後"}, {"en": "again", "ja": "もう一度"}, {"en": "age", "ja": "年齢"}, {"en": "air", "ja": "空気"}, {"en": "animal", "ja": "動物"}, {"en": "answer", "ja": "答え"}, {"en": "April", "ja": "4月"}, {"en": "around", "ja": "～のまわりに"}, {"en": "arrive", "ja": "到着する"}, {"en": "art", "ja": "美術、芸術"}, {"en": "August", "ja": "8月"}, {"en": "away", "ja": "離れて"}, {"en": "baby", "ja": "赤ちゃん"}, {"en": "back", "ja": "後ろ、戻って"}, {"en": "bad", "ja": "悪い"}, {"en": "ball", "ja": "ボール"}, {"en": "beautiful", "ja": "美しい"}, {"en": "because", "ja": "なぜなら"}, {"en": "become", "ja": "～になる"}, {"en": "before", "ja": "～の前に"}, {"en": "begin", "ja": "始める"}, {"en": "behind", "ja": "～の後ろに"}, {"en": "believe", "ja": "信じる"}, {"en": "best", "ja": "最高の"}, {"en": "better", "ja": "よりよい"}, {"en": "birthday", "ja": "誕生日"}, {"en": "black", "ja": "黒い"}, {"en": "blue", "ja": "青い"}, {"en": "boat", "ja": "ボート"}, {"en": "book", "ja": "本"}, {"en": "both", "ja": "両方"}, {"en": "break", "ja": "壊す、休憩"}, {"en": "bring", "ja": "持ってくる"}, {"en": "brother", "ja": "兄、弟"}, {"en": "busy", "ja": "忙しい"}, {"en": "buy", "ja": "買う"}, {"en": "call", "ja": "呼ぶ、電話する"}, {"en": "camera", "ja": "カメラ"}, {"en": "careful", "ja": "注意深い"}, {"en": "carry", "ja": "運ぶ"}, {"en": "catch", "ja": "つかまえる"}, {"en": "center", "ja": "中心"}, {"en": "change", "ja": "変える、変化"}, {"en": "class", "ja": "授業、クラス"}, {"en": "clean", "ja": "きれいな、掃除する"}, {"en": "climb", "ja": "登る"}, {"en": "close", "ja": "閉じる、近い"}, {"en": "cloud", "ja": "雲"}, {"en": "club", "ja": "クラブ"}, {"en": "color", "ja": "色"}, {"en": "come", "ja": "来る"}, {"en": "computer", "ja": "コンピューター"}, {"en": "cook", "ja": "料理する"}, {"en": "country", "ja": "国"}, {"en": "course", "ja": "コース、進路"}, {"en": "dance", "ja": "踊る"}, {"en": "December", "ja": "12月"}, {"en": "different", "ja": "違った"}, {"en": "difficult", "ja": "難しい"}, {"en": "door", "ja": "ドア"}, {"en": "down", "ja": "下へ"}, {"en": "draw", "ja": "描く"}, {"en": "dream", "ja": "夢"}, {"en": "early", "ja": "早い、早く"}, {"en": "easy", "ja": "簡単な"}, {"en": "eat", "ja": "食べる"}, {"en": "English", "ja": "英語"}, {"en": "enjoy", "ja": "楽しむ"}, {"en": "evening", "ja": "夕方、晩"}, {"en": "every", "ja": "すべての、毎～"}, {"en": "example", "ja": "例"}, {"en": "exciting", "ja": "わくわくする"}, {"en": "fall", "ja": "秋、落ちる"}, {"en": "family", "ja": "家族"}, {"en": "famous", "ja": "有名な"}, {"en": "far", "ja": "遠い"}, {"en": "favorite", "ja": "お気に入りの"}, {"en": "February", "ja": "2月"}, {"en": "field", "ja": "野原、競技場"}, {"en": "find", "ja": "見つける"}, {"en": "finish", "ja": "終える"}, {"en": "first", "ja": "最初の、1番目"}, {"en": "fish", "ja": "魚"}, {"en": "flower", "ja": "花"}, {"en": "fly", "ja": "飛ぶ"}, {"en": "food", "ja": "食べ物"}, {"en": "forget", "ja": "忘れる"}, {"en": "friend", "ja": "友達"}, {"en": "front", "ja": "前"}, {"en": "future", "ja": "未来"}, {"en": "game", "ja": "ゲーム、試合"}, {"en": "garden", "ja": "庭"}, {"en": "get", "ja": "得る、着く"}, {"en": "give", "ja": "与える"}, {"en": "glad", "ja": "うれしい"}, {"en": "glass", "ja": "コップ、ガラス"}, {"en": "go", "ja": "行く"}, {"en": "good", "ja": "よい"}, {"en": "great", "ja": "すばらしい"}, {"en": "green", "ja": "緑の"}, {"en": "grow", "ja": "育つ、育てる"}, {"en": "half", "ja": "半分"}, {"en": "happy", "ja": "幸せな"}, {"en": "hard", "ja": "難しい、一生懸命に"}, {"en": "health", "ja": "健康"}, {"en": "hear", "ja": "聞こえる"}, {"en": "help", "ja": "助ける"}, {"en": "holiday", "ja": "休日"}, {"en": "home", "ja": "家、家庭"}, {"en": "hope", "ja": "望む、希望"}, {"en": "hospital", "ja": "病院"}, {"en": "hour", "ja": "時間、1時間"}, {"en": "hungry", "ja": "空腹の"}, {"en": "important", "ja": "重要な"}, {"en": "interesting", "ja": "おもしろい"}, {"en": "January", "ja": "1月"}, {"en": "July", "ja": "7月"}, {"en": "June", "ja": "6月"}, {"en": "keep", "ja": "保つ"}, {"en": "kind", "ja": "親切な、種類"}, {"en": "know", "ja": "知っている"}, {"en": "language", "ja": "言語"}, {"en": "last", "ja": "最後の、続く"}, {"en": "learn", "ja": "学ぶ"}, {"en": "leave", "ja": "去る、出発する"}, {"en": "left", "ja": "左、左の"}, {"en": "letter", "ja": "手紙、文字"}, {"en": "library", "ja": "図書館"}, {"en": "listen", "ja": "聞く"}, {"en": "little", "ja": "小さい、少し"}, {"en": "long", "ja": "長い"}, {"en": "look", "ja": "見る"}, {"en": "love", "ja": "愛する、大好き"}, {"en": "lunch", "ja": "昼食"}, {"en": "March", "ja": "3月"}, {"en": "May", "ja": "5月"}, {"en": "meet", "ja": "会う"}, {"en": "member", "ja": "メンバー"}, {"en": "minute", "ja": "分"}, {"en": "money", "ja": "お金"}, {"en": "month", "ja": "月"}, {"en": "morning", "ja": "朝"}, {"en": "move", "ja": "動く、引っ越す"}, {"en": "movie", "ja": "映画"}, {"en": "music", "ja": "音楽"}, {"en": "name", "ja": "名前"}, {"en": "near", "ja": "近くに"}, {"en": "never", "ja": "決して～ない"}, {"en": "next", "ja": "次の"}, {"en": "nice", "ja": "すてきな、親切な"}, {"en": "night", "ja": "夜"}, {"en": "November", "ja": "11月"}, {"en": "October", "ja": "10月"}, {"en": "often", "ja": "よく"}, {"en": "once", "ja": "一度"}, {"en": "open", "ja": "開ける、開いている"}, {"en": "outside", "ja": "外で、外側"}, {"en": "over", "ja": "～の上に、終わって"}, {"en": "parent", "ja": "親"}, {"en": "park", "ja": "公園"}, {"en": "part", "ja": "部分"}, {"en": "people", "ja": "人々"}, {"en": "place", "ja": "場所"}, {"en": "plant", "ja": "植物、植える"}, {"en": "play", "ja": "遊ぶ、演奏する"}, {"en": "please", "ja": "どうぞ、喜ばせる"}, {"en": "practice", "ja": "練習する"}, {"en": "question", "ja": "質問"}, {"en": "quickly", "ja": "速く"}, {"en": "read", "ja": "読む"}, {"en": "ready", "ja": "準備のできた"}, {"en": "remember", "ja": "覚えている"}, {"en": "right", "ja": "右、正しい"}, {"en": "river", "ja": "川"}, {"en": "room", "ja": "部屋"}, {"en": "run", "ja": "走る"}, {"en": "school", "ja": "学校"}, {"en": "season", "ja": "季節"}, {"en": "second", "ja": "秒、2番目"}, {"en": "September", "ja": "9月"}, {"en": "short", "ja": "短い"}, {"en": "show", "ja": "見せる"}, {"en": "sing", "ja": "歌う"}, {"en": "sister", "ja": "姉、妹"}, {"en": "sleep", "ja": "眠る"}, {"en": "small", "ja": "小さい"}, {"en": "sometimes", "ja": "ときどき"}, {"en": "song", "ja": "歌"}, {"en": "speak", "ja": "話す"}, {"en": "start", "ja": "始める、始まる"}, {"en": "stay", "ja": "滞在する、いる"}, {"en": "still", "ja": "まだ、それでも"}, {"en": "stop", "ja": "止める、止まる"}, {"en": "story", "ja": "物語"}, {"en": "strong", "ja": "強い"}, {"en": "student", "ja": "生徒"}, {"en": "study", "ja": "勉強する"}, {"en": "summer", "ja": "夏"}, {"en": "sure", "ja": "確かな、もちろん"}];
-const KEY="eiken4_flashcard_status_v2";
+const pastForms={"arrive": "arrived", "become": "became", "begin": "began", "believe": "believed", "break": "broke", "bring": "brought", "buy": "bought", "call": "called", "carry": "carried", "catch": "caught", "change": "changed", "clean": "cleaned", "climb": "climbed", "close": "closed", "come": "came", "cook": "cooked", "dance": "danced", "draw": "drew", "dream": "dreamed", "eat": "ate", "enjoy": "enjoyed", "fall": "fell", "find": "found", "finish": "finished", "fly": "flew", "forget": "forgot", "get": "got", "give": "gave", "go": "went", "grow": "grew", "help": "helped", "hope": "hoped", "keep": "kept", "know": "knew", "learn": "learned", "leave": "left", "listen": "listened", "look": "looked", "love": "loved", "meet": "met", "move": "moved", "open": "opened", "park": "parked", "play": "played", "practice": "practiced", "read": "read", "remember": "remembered", "run": "ran", "show": "showed", "sing": "sang", "sleep": "slept", "speak": "spoke", "start": "started", "stay": "stayed", "stop": "stopped", "study": "studied", "swim": "swam", "tell": "told", "think": "thought", "travel": "traveled", "try": "tried", "understand": "understood", "use": "used", "visit": "visited", "wait": "waited", "walk": "walked", "want": "wanted", "welcome": "welcomed", "work": "worked", "write": "wrote", "plant": "planted"};
+const KEY="eiken4_flashcard_status_v3";
 let status=JSON.parse(localStorage.getItem(KEY)||"{}");
 let words=[...original], idx=0, flipped=false, reviewMode=false;
+let retentionList=[], retentionIndex=0;
 
 function save(){localStorage.setItem(KEY,JSON.stringify(status))}
 function isLearned(en){return status[en]===true}
 function reviewWords(){return original.filter(w=>!isLearned(w.en))}
+function learnedWords(){return original.filter(w=>isLearned(w.en))}
 
 function render(){
  if(!words.length) return;
  const w=words[idx];
+ const p=pastForms[w.en];
  document.getElementById("word").textContent=w.en;
  document.getElementById("meaning").textContent=w.ja;
+ document.getElementById("past").textContent=p ? "過去形： "+p : "";
  document.getElementById("meaning").classList.toggle("hidden",!flipped);
+ document.getElementById("past").classList.toggle("hidden",!flipped || !p);
  document.getElementById("hint").textContent=flipped?"裏":"表";
  document.getElementById("tap").textContent=flipped?"タップして英単語に戻す":"タップして日本語を表示";
  document.getElementById("count").textContent=(idx+1)+" / "+words.length+(reviewMode?"  (復習)":"");
@@ -141,8 +163,56 @@ function resetAll(){
  if(!confirm("学習状況をすべてリセットしますか？"))return;
  status={};save();words=[...original];reviewMode=false;idx=0;flipped=false;
  document.getElementById("status").textContent="学習状況をリセットしました";
- render();
+ document.getElementById("quiz").classList.remove("active");render();
 }
+
+function startRetention(){
+ const learned=learnedWords();
+ if(!learned.length){alert("まずいくつかの単語を「覚えた」にしてください。");return}
+ retentionList=[...learned].sort(()=>Math.random()-.5);
+ retentionIndex=0;
+ document.getElementById("quiz").classList.add("active");
+ document.getElementById("status").textContent="覚えた単語の定着をチェックします";
+ showRetentionQuestion();
+ window.scrollTo({top:document.body.scrollHeight,behavior:"smooth"});
+}
+function showRetentionQuestion(){
+ const w=retentionList[retentionIndex];
+ document.getElementById("quizWord").textContent=w.en;
+ document.getElementById("quizResult").textContent="";
+ document.getElementById("quizNext").style.display="none";
+ const pool=[w];
+ while(pool.length<4){const x=original[Math.floor(Math.random()*original.length)];if(!pool.some(y=>y.en===x.en))pool.push(x)}
+ pool.sort(()=>Math.random()-.5);
+ const box=document.getElementById("quizOptions");box.innerHTML="";
+ pool.forEach(x=>{
+   const b=document.createElement("button");b.textContent=x.ja;
+   b.onclick=()=>retentionAnswer(x.en===w.en,b,w);
+   box.appendChild(b);
+ });
+}
+function retentionAnswer(ok,btn,w){
+ document.querySelectorAll("#quizOptions button").forEach(b=>b.disabled=true);
+ const result=document.getElementById("quizResult");
+ if(ok){
+   result.textContent="⭕ 正解！しっかり定着しています。";
+ }else{
+   result.textContent="❌ もう一度復習しましょう。復習リストに戻しました。";
+   status[w.en]=false;save();
+   render();
+ }
+ document.getElementById("quizNext").style.display="inline-block";
+}
+function nextRetention(){
+ retentionIndex++;
+ if(retentionIndex>=retentionList.length){
+   document.getElementById("quizResult").textContent="🎉 定着チェック完了！";
+   document.getElementById("quizNext").style.display="none";
+   return;
+ }
+ showRetentionQuestion();
+}
+
 function speak(){
  if(!("speechSynthesis" in window)){alert("このブラウザでは音声機能を利用できません。");return}
  speechSynthesis.cancel();
